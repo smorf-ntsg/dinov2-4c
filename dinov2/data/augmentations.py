@@ -4,8 +4,9 @@
 # found in the LICENSE file in the root directory of this source tree.
 
 import logging
-
+import numpy as np
 from torchvision import transforms
+from PIL import Image
 
 from .transforms import (
     GaussianBlur,
@@ -60,15 +61,30 @@ class DataAugmentationDINO(object):
         )
 
         # color distorsions / blurring
-        color_jittering = transforms.Compose(
-            [
-                transforms.RandomApply(
-                    [transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.2, hue=0.1)],
-                    p=0.8,
-                ),
-                transforms.RandomGrayscale(p=0.2),
-            ]
-        )
+        def color_jittering(im, strength):
+            # Modify this function to handle 4-channel images
+            if im.shape[2] == 4:  # Check if the image has 4 channels
+                rgb_im = im[:, :, :3]
+                nir_im = im[:, :, 3]
+                
+                # Apply color jittering to RGB channels
+                rgb_im = transforms.ColorJitter(
+                    brightness=0.4 * strength,
+                    contrast=0.4 * strength,
+                    saturation=0.4 * strength,
+                    hue=0.1 * strength,
+                )(rgb_im)
+                
+                # Combine RGB and NIR channels
+                return np.dstack((rgb_im, nir_im))
+            else:
+                # Original implementation for 3-channel images
+                return transforms.ColorJitter(
+                    brightness=0.4 * strength,
+                    contrast=0.4 * strength,
+                    saturation=0.4 * strength,
+                    hue=0.1 * strength,
+                )(im)
 
         global_transfo1_extra = GaussianBlur(p=1.0)
 
@@ -94,25 +110,22 @@ class DataAugmentationDINO(object):
         self.local_transfo = transforms.Compose([color_jittering, local_transfo_extra, self.normalize])
 
     def __call__(self, image):
-        output = {}
+        # Modify this method to handle 4-channel images
+        if isinstance(image, np.ndarray) and image.shape[2] == 4:
+            # Convert numpy array to PIL Image for RGB channels
+            rgb_image = Image.fromarray(image[:, :, :3].astype(np.uint8))
+            nir_channel = image[:, :, 3]
 
-        # global crops:
-        im1_base = self.geometric_augmentation_global(image)
-        global_crop_1 = self.global_transfo1(im1_base)
-
-        im2_base = self.geometric_augmentation_global(image)
-        global_crop_2 = self.global_transfo2(im2_base)
-
-        output["global_crops"] = [global_crop_1, global_crop_2]
-
-        # global crops for teacher:
-        output["global_crops_teacher"] = [global_crop_1, global_crop_2]
-
-        # local crops:
-        local_crops = [
-            self.local_transfo(self.geometric_augmentation_local(image)) for _ in range(self.local_crops_number)
-        ]
-        output["local_crops"] = local_crops
-        output["offsets"] = ()
-
-        return output
+            crops = []
+            for i, (scale, n_crop) in enumerate(zip(self.scales, self.n_crops)):
+                for _ in range(n_crop):
+                    rgb_crop = self.global_transfo(rgb_image.copy())
+                    nir_crop = self.global_transfo(Image.fromarray(nir_channel))
+                    
+                    # Combine RGB and NIR channels
+                    combined_crop = np.dstack((np.array(rgb_crop), np.array(nir_crop)))
+                    crops.append(combined_crop)
+            return crops
+        else:
+            # Original implementation for 3-channel images
+            return super().__call__(image)
