@@ -1,3 +1,17 @@
+# DINOv2-4C: Self-Supervised Learning for 4-Channel Aerial Imagery
+
+This repository is a fork of the original [DINOv2](https://github.com/facebookresearch/dinov2) project, adapted for self-supervised learning on 4-channel aerial imagery.
+
+## Modifications
+
+The key changes made to the original DINOv2 codebase include:
+
+* **New Aerial Image Dataset:** A new dataset class (`AerialImageNet`) has been added to handle loading and preprocessing 4-channel aerial images (Red, Green, Blue, and Infrared bands).
+* **Updated Augmentations:** The data augmentation pipeline has been adjusted to work with 4-channel images and includes augmentations suitable for aerial imagery (e.g., rotations, random crops).
+* **Patch Embedding:** The `PatchEmbed` layer in the Vision Transformer (ViT) has been modified to accept 4-channel input images.
+* **Configuration:** Training configurations have been updated to reflect the new dataset, input image size (512x512), and other relevant hyperparameters.
+
+
 :new: [2023-10-26] *Added DINOv2 backbones with registers, following [Vision Transformers Need Registers](https://arxiv.org/abs/2309.16588).*
 
 # DINOv2: Learning Robust Visual Features without Supervision
